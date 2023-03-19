@@ -1,0 +1,6 @@
+#!/bin/bash
+
+export POSIXLY_CORRECT=yes
+export LC_ALL=C
+
+export MOLE_RC="$HOME/Desktop/kayfcoding/ios/proj1/.molerc"
