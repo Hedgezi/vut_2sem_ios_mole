@@ -2,16 +2,15 @@
 
 usage() { printf " mole [-g GROUP] FILE\n mole [-m] [FILTERS] [DIRECTORY]\n mole list [FILTERS] [DIRECTORY]\n mole secret-log [-b DATE] [-a DATE] [DIRECTORY1 [DIRECTORY2 [...]]\n" 1>&2; exit 0; }
 # check_groups() {
-
+#    grep "^[A-Za-z1-9,]*$" 
 # }
 write_a_record() {
-    temp="$(grep -m 1 "$1;$2" "$MOLE_RC")"
+    temp="$(grep -m 1 "$1;$2" "$MOLE_RC")" # rewrite with awk, cause (br4 == br4h)
     if [ "$temp" = "" ]
     then
         echo "$1;$2;$3;$4" >> "$MOLE_RC"
     else
-        # grep -o -m 1 "$3"
-        if [ "$3" = "" ] || [ "$(echo "$temp" | cut -d ";" -f 3 | awk -F "," -v '')" != "" ]
+        if [ "$3" = "" ] || [ "$(echo "$temp" | cut -d ";" -f 3 | grep -o -m 1 "$3")" != "" ] # rewrite to check more groups
         then
             sed -i "s#$temp#$temp;$4#" "$MOLE_RC"
         else
@@ -21,10 +20,33 @@ write_a_record() {
     fi
 }
 open_file_from_dir() {
-    awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2}} END{print mindate["file"]}'
+    filename="$(awk -v file="$1" 'BEGIN{FS=OFS=";"; } {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
 }
 open_file_from_dir_most_freq() {
-    awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2}} END{print mindate["file"]}'
+    filename="$(awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+}
+make_list() {
+    awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; maxlength=0} {if (maxlength < length($2)) {maxlength = length($2);}} END{print maxlength+1}'
+}
+check_args_correctness() {
+    if [ "$1" == "file" ]
+    then
+        if [ "$2" != "" ]
+        then
+            echo "Invalid options selected. Use -h for help." 1>&2
+            exit 1
+        fi
+        if [ "$3" != "" ]
+        then
+            echo "Invalid options selected. Use -h for help." 1>&2
+            exit 1
+        fi
+        if [ "$4" != "" ]
+        then
+            echo "Invalid options selected. Use -h for help." 1>&2
+            exit 1
+        fi
+    fi
 }
 
 if [ "$MOLE_RC" = "" ]
@@ -33,7 +55,13 @@ then
     exit 2
 fi
 
-while getopts ":hmg:" argum; do
+if [ "$1" == "list" ]
+then
+    make_list "$(pwd)"
+    exit 0
+fi
+
+while getopts ":hmg:a:b:" argum; do
     case "${argum}" in
         h)
             usage
@@ -43,6 +71,12 @@ while getopts ":hmg:" argum; do
             ;;
         m)
             recentlyflag="true"
+            ;;
+        a)
+            afterdate="${OPTARG}"
+            ;;
+        b)
+            beforedate="${OPTARG}"
             ;;
         *)
             echo "Invalid options selected. Use -h for help." 1>&2
@@ -63,17 +97,25 @@ fi
 
 if [ "$(find "$filename" -type d -maxdepth 0 -exec echo dir \; 2>/dev/null)" == "" ]
 then
+    check_args_correctness "file" "$recentlyflag" "$afterdate" "$beforedate"
     filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
     onlyfilename="$(echo "$filename" | rev | cut -d'/' -f 1 | rev)"
     write_a_record "$filepath" "$onlyfilename" "$groups" "$(date "+%Y-%m-%d_%H-%M-%S")"
     vim "$filename"
 else
+    check_args_correctness "dir" "$recentlyflag" "$afterdate" "$beforedate"
     if [ "$recentlyflag" != "" ]
     then
         open_file_from_dir_most_freq "$filename"
+        filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
+        onlyfilename="$(echo "$filename" | rev | cut -d'/' -f 1 | rev)"
+        write_a_record "$filepath" "$onlyfilename" "$groups" "$(date "+%Y-%m-%d_%H-%M-%S")"
         vim "$filename"
     else
-        open_file_from_dir "$filename"
+        open_file_from_dir "$filename" "$groups"
+        filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
+        onlyfilename="$(echo "$filename" | rev | cut -d'/' -f 1 | rev)"
+        write_a_record "$filepath" "$onlyfilename" "$groups" "$(date "+%Y-%m-%d_%H-%M-%S")"
         vim "$filename"
     fi
 fi
