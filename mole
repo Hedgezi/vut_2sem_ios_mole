@@ -25,10 +25,22 @@ write_a_record() {
     fi
 }
 open_file_from_dir() {
-    filename="$(awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
-}
-open_file_from_dir_most_freq() {
-    filename="$(awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+    if [ "$1" == "recently" ]
+    then
+        filename="$(awk -v file="$2" -v groupsstr="$3" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+    elif [ "$1" == "frequently" ]
+    then
+        filename="$(awk -v file="$2" -v groupsstr="$3" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+    else
+        echo "Invalid argument in func open_file_from_dir. Coder's problem." 1>&2
+        exit 99
+    fi
+
+    if [ "$filename" == "" ]
+    then
+        echo "No entries that meets your filters" 1>&2
+        exit 3
+    fi
 }
 make_list() {
     awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; maxlength=0} {if (maxlength < length($2)) {maxlength = length($2);}} END{print maxlength+1}'
@@ -36,29 +48,23 @@ make_list() {
 check_args_correctness() {
     if [ "$1" == "file" ]
     then
-        if [ "$2" != "" ]
-        then
-            echo "Invalid options selected. Use -h for help." 1>&2
-            exit 1
-        fi
-        if [ "$3" != "" ]
-        then
-            echo "Invalid options selected. Use -h for help." 1>&2
-            exit 1
-        fi
-        if [ "$4" != "" ]
+        if [ "$2" != "" ] || [ "$3" != "" ] || [ "$4" != "" ]
         then
             echo "Invalid options selected. Use -h for help." 1>&2
             exit 1
         fi
     fi
 }
+check_env_variables() {
+    if [ "$MOLE_RC" = "" ]
+    then
+        echo "MOLE_RC not set"
+        exit 2
+    fi
 
-if [ "$MOLE_RC" = "" ]
-then
-    echo "MOLE_RC not set"
-    exit 2
-fi
+}
+
+check_env_variables
 
 if [ "$1" == "list" ]
 then
@@ -111,18 +117,16 @@ else
     check_args_correctness "dir" "$recentlyflag" "$afterdate" "$beforedate"
     if [ "$recentlyflag" != "" ]
     then
-        open_file_from_dir_most_freq "$filename"
+        open_file_from_dir "frequently" "$filename" "$groups" "$afterdate" "$beforedate"
         filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
         onlyfilename="$(echo "$filename" | rev | cut -d'/' -f 1 | rev)"
         write_a_record "$filepath" "$onlyfilename" "$groups" "$(date "+%Y-%m-%d_%H-%M-%S")"
         vim "$filename"
     else
-        open_file_from_dir "$filename" "$groups"
+        open_file_from_dir "recently" "$filename" "$groups" "$afterdate" "$beforedate"
         filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
         onlyfilename="$(echo "$filename" | rev | cut -d'/' -f 1 | rev)"
         write_a_record "$filepath" "$onlyfilename" "$groups" "$(date "+%Y-%m-%d_%H-%M-%S")"
         vim "$filename"
     fi
 fi
-
-# awk -F ';' -v dateA="2023-03-12" '{if (dateA>=$3) {print}}' "$MOLE_RC"
