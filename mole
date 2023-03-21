@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 usage() { printf " mole [-g GROUP] FILE\n mole [-m] [FILTERS] [DIRECTORY]\n mole list [FILTERS] [DIRECTORY]\n mole secret-log [-b DATE] [-a DATE] [DIRECTORY1 [DIRECTORY2 [...]]\n" 1>&2; exit 0; }
 # check_groups() {
@@ -19,34 +19,31 @@ write_a_record() {
         then
             sed -i "s#$temp#$temp;$4#" "$MOLE_RC"
         else
-            groupsnew="$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ",")} {oldgroupsnum=split($3, oldgrps, ","); for (i in oldgrps) {fullgrps[i] = oldgrps[i]}; ogncounter = 0; for (i in newgrps) {needtoadd = 1; for (j in oldgrps) {if (newgrps[i] == oldgrps[j]) {needtoadd = 0; break;}}; if (needtoadd == 1) {fullgrps[oldgroupsnum+ogncounter] = newgrps[i]; ogncounter = ogncounter + 1;}};} END{result = fullgrps[1] ","; for (i = 2; i <= oldgroupsnum+ogncounter-1; i++) {result = result fullgrps[i] ","}; print result}')"
+            groupsnew="$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ",")} {oldgroupsnum=split($3, oldgrps, ","); if (oldgroupsnum==0) {oldgroupsnum=1;}; for (i in oldgrps) {fullgrps[i] = oldgrps[i]}; ogncounter = 0; for (i in newgrps) {needtoadd = 1; for (j in oldgrps) {if (newgrps[i] == oldgrps[j]) {needtoadd = 0; break;}}; if (needtoadd == 1) {fullgrps[oldgroupsnum+ogncounter] = newgrps[i]; ogncounter = ogncounter + 1;}};} END{result = fullgrps[1] ","; for (i = 2; i <= oldgroupsnum+ogncounter-1; i++) {result = result fullgrps[i] ","}; print result}')"
             sed -i "s#$temp#$(echo "$temp"|cut -d ";" -f 1-2);$groupsnew;$(echo "$temp"|cut -d ";" -f 4-);$4#" "$MOLE_RC"
         fi
     fi
 }
 open_file_from_dir() {
-    if [ "$1" == "recently" ]
+    if [ "$1" = "recently" ]
     then
         filename="$(awk -v file="$2" -v groupsstr="$3" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
-    elif [ "$1" == "frequently" ]
+    elif [ "$1" = "frequently" ]
     then
-        filename="$(awk -v file="$2" -v groupsstr="$3" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+        filename="$(awk -v file="$2" -v groupsstr="$3" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
     else
         echo "Invalid argument in func open_file_from_dir. Coder's problem." 1>&2
         exit 99
     fi
 
-    if [ "$filename" == "/" ]
+    if [ "$filename" = "/" ]
     then
         echo "No entries that meets your filters" 1>&2
         exit 3
     fi
 }
-make_list() {
-    awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; maxlength=0} {if (maxlength < length($2)) {maxlength = length($2);}} END{print maxlength+1}'
-}
 check_args_correctness() {
-    if [ "$1" == "file" ]
+    if [ "$1" = "file" ]
     then
         if [ "$2" != "" ] || [ "$3" != "" ] || [ "$4" != "" ]
         then
@@ -63,12 +60,51 @@ check_env_variables() {
     fi
 
 }
+make_list() {
+    # awk -v file="$1" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_RC" | awk 'BEGIN{FS=OFS=";"; maxlength=0} {if (maxlength < length($2)) {maxlength = length($2);}} END{print maxlength+1}'
+    check_env_variables
+    shift 1
+    while getopts ":g:a:b:" argum; do
+        case "${argum}" in
+            g)
+                groups="${OPTARG}"
+                ;;
+            a)
+                afterdate="${OPTARG}"
+                ;;
+            b)
+                beforedate="${OPTARG}"
+                ;;
+            *)
+                echo "Invalid options selected. Use -h for help." 1>&2
+                exit 1
+                ;;
+        esac
+    done
+    shift "$((OPTIND-1))"
+
+    if [ "$1" = "" ]
+    then
+        filename="$(pwd)"
+    else
+        filename="$(realpath -s "$1")"
+    fi
+
+    if [ "$(find "$filename" -type d -maxdepth 0 -exec echo dir \; 2>/dev/null)" != "dir" ]
+    then
+        echo "mole list needs folder as argument!" 1>&2
+        exit 3
+    fi
+
+    sort "$MOLE_RC" | awk -v file="$filename" -v groupsstr="$groups" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";";} {print $2":;"substr($3, 1, length($3)-1);}' | column -t -s ";" -c 1
+}
+
 
 check_env_variables
 
-if [ "$1" == "list" ]
+if [ "$1" = "list" ]
 then
-    make_list "$(pwd)"
+    make_list "$@"
     exit 0
 fi
 
@@ -98,7 +134,7 @@ done
 shift "$((OPTIND-1))"
 
 
-if [ "$1" == "" ]
+if [ "$1" = "" ]
 then
     filename="$(pwd)"
 else
@@ -106,7 +142,7 @@ else
 fi
 
 
-if [ "$(find "$filename" -type d -maxdepth 0 -exec echo dir \; 2>/dev/null)" == "" ]
+if [ "$(find "$filename" -type d -maxdepth 0 -exec echo dir \; 2>/dev/null)" = "" ]
 then
     check_args_correctness "file" "$recentlyflag" "$afterdate" "$beforedate"
     filepath="$(echo "$filename" | rev | cut -d'/' -f 2- | rev)"
