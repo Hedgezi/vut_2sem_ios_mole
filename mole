@@ -96,7 +96,8 @@ make_list() {
         exit 3
     fi
 
-    sort "$MOLE_RC" | awk -v file="$filename" -v groupsstr="$groups" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else {if ($1==file) {print $0}}}' | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";";} {print $2":;"substr($3, 1, length($3)-1);}' | column -t -s ";" -c 1
+    sort "$MOLE_RC" | awk -v file="$filename" -v groupsstr="$groups" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {kek=$3; if ($1==file && gsub(groups[i]",", "rep", kek) != 0) {print $0}}} else {if ($1==file) {print $0}}}' | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";";} {print $2":;"substr($3, 1, length($3)-1);}' | column -t -s ";" -c 1
+
 }
 
 
