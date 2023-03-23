@@ -199,9 +199,6 @@ $(awk -v file="$filename" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_
     done
     resultlog=$(echo "$resultlog" | sort)
     echo "$resultlog"
-    # awk -v file="$filename" 'BEGIN{FS=OFS=";"; filesnum=split(filename, fileslist, " ")} {for (i in fileslist) {if ($1==fileslist[i]) {print $0}}}' "$MOLE_RC"
-
-    # awk -v file="$filename" 'BEGIN{FS=OFS=";"; filesnum=split(filename, fileslist, " ")} {if ($1==fileslist[i]) {print $0}}' "$MOLE_RC" | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {result = ""; for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {if (result == "") {result = $1"/"$2";"$(i)} else {result = result";"$(i)}}} if (result != "") {print result;}}'
 }
 
 
@@ -231,7 +228,7 @@ while getopts ":hmg:a:b:" argum; do
             recentlyflag="true"
             ;;
         a)
-            afterdate="${OPTARG}" # [0-9]{4}-[0-9]{2}-[0-9]{2}
+            afterdate="${OPTARG}"
             ;;
         b)
             beforedate="${OPTARG}"
