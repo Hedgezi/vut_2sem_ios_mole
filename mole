@@ -1,5 +1,6 @@
 #!/bin/sh
 # xvoron03 Vorontsov Mykola
+# -d works
 
 export POSIXLY_CORRECT=true
 
@@ -15,11 +16,11 @@ write_a_record() {
             echo "$1;$2;$3,;$4" >> "$MOLE_RC"
         fi
     else
-        if [ "$3" = "" ] || [ "$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ","); counter = 0;} {oldgroupsnum=split($3, oldgrps, ","); for (i in oldgrps) {for (j in newgrps) {if (oldgrps[i] == newgrps[j]) {counter=counter+1;}}};} END{if (newgroupsnum == counter) {print "dont need"}}')" != "" ]
+        if [ "$3" = "" ] || [ "$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ","); counter = 0;} {oldgroupsnum=split($3, oldgrps, ","); for (i in oldgrps) {for (j in newgrps) {if (oldgrps[i] == newgrps[j]) {counter=counter+1;}}};} END{if (newgroupsnum == counter) {print "dont need"}}')" != "" ] # if groups are the same
         then
             sed -i "s#$temp#$temp;$4#" "$MOLE_RC"
         else
-            groupsnew="$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ",")} {oldgroupsnum=split($3, oldgrps, ","); if (oldgroupsnum==0) {oldgroupsnum=1;}; for (i in oldgrps) {fullgrps[i] = oldgrps[i]}; ogncounter = 0; for (i in newgrps) {needtoadd = 1; for (j in oldgrps) {if (newgrps[i] == oldgrps[j]) {needtoadd = 0; break;}}; if (needtoadd == 1) {fullgrps[oldgroupsnum+ogncounter] = newgrps[i]; ogncounter = ogncounter + 1;}};} END{result = fullgrps[1] ","; for (i = 2; i <= oldgroupsnum+ogncounter-1; i++) {result = result fullgrps[i] ","}; print result}')"
+            groupsnew="$(echo "$temp" | awk -F ';' -v newgroupsstr="$3" 'BEGIN{newgroupsnum=split(newgroupsstr, newgrps, ",")} {oldgroupsnum=split($3, oldgrps, ","); if (oldgroupsnum==0) {oldgroupsnum=1;}; for (i in oldgrps) {fullgrps[i] = oldgrps[i]}; ogncounter = 0; for (i in newgrps) {needtoadd = 1; for (j in oldgrps) {if (newgrps[i] == oldgrps[j]) {needtoadd = 0; break;}}; if (needtoadd == 1) {fullgrps[oldgroupsnum+ogncounter] = newgrps[i]; ogncounter = ogncounter + 1;}};} END{result = fullgrps[1] ","; for (i = 2; i <= oldgroupsnum+ogncounter-1; i++) {result = result fullgrps[i] ","}; print result}')" # adds only new groups to the old ones
             sed -i "s#$temp#$(echo "$temp"|cut -d ";" -f 1-2);$groupsnew;$(echo "$temp"|cut -d ";" -f 4-);$4#" "$MOLE_RC"
         fi
     fi
@@ -27,16 +28,16 @@ write_a_record() {
 open_file_from_dir() {
     if [ "$1" = "recently" ]
     then
-        filename="$(awk -v file="$2" -v groupsstr="$3" -v defaultfl="$6" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+        filename="$(awk -v file="$2" -v groupsstr="$3" -v defaultfl="$6" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["date"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["date"] < $(NF)) {mindate["date"]=$(NF); mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')" # sorts by groups, then by date and then finds the most recent one
     elif [ "$1" = "frequently" ]
     then
-        filename="$(awk -v file="$2" -v groupsstr="$3" -v defaultfl="$6" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')"
+        filename="$(awk -v file="$2" -v groupsstr="$3" -v defaultfl="$6" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {if ($1==file && gsub(groups[i]",", $3) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' "$MOLE_RC" | awk -v afterdate="$4" -v beforedate="$5" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";"; mindate["amount"]=0; mindate["file"]=""; mindate["filepath"]="";} {if (NR==1) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}; if (mindate["amount"] < NF) {mindate["amount"]=NF; mindate["file"]=$2; mindate["filepath"]=$1;}} END{print mindate["filepath"]"/"mindate["file"]}')" # sorts by groups, then by date and then finds the most frequent one
     else
         echo "Invalid argument in func open_file_from_dir. Coder's problem." 1>&2
         exit 99
     fi
 
-    if [ "$filename" = "/" ]
+    if [ "$filename" = "/" ] # if there are no entries that match the filters
     then
         echo "No entries that match your filters" 1>&2
         exit 3
@@ -115,12 +116,12 @@ check_env_variables() {
         editor="$EDITOR"
     fi
     realpath / 1> /dev/null 2> /dev/null
-    if [ "$?" = 127 ]
+    if [ "$?" = 127 ] # if realpath is not installed
     then
         echo "Realpath is not installed on your system!" 1>&2
         exit 2
     fi
-    if [ "$(realpath "$MOLE_RC" 2> /dev/null)" = "" ]
+    if [ "$(realpath "$MOLE_RC" 2> /dev/null)" = "" ] # if MOLE_RC is not a valid path, then create it
     then
         mkdir -p "$(echo "$MOLE_RC" | rev | cut -d'/' -f 2- | rev)"
         touch "$MOLE_RC"
@@ -166,7 +167,7 @@ make_list() {
         exit 3
     fi
 
-    sort "$MOLE_RC" | awk -v file="$filename" -v groupsstr="$groups" -v defaultfl="$defaultflag" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {kek=$3; if ($1==file && gsub(groups[i]",", "rep", kek) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";";} {if ($3 == "") {print $2":;-";} else {print $2":;"substr($3, 1, length($3)-1);}}' | column -t -s ";" | awk 'BEGIN{FS=OFS=":";} {print $1":"substr($2, 2, length($2));}'
+    sort "$MOLE_RC" | awk -v file="$filename" -v groupsstr="$groups" -v defaultfl="$defaultflag" 'BEGIN{FS=OFS=";"; if (groupsstr != "") {groupsnum=split(groupsstr, groups, ",");}} {if (groupsstr != "") {for (i in groups) {kek=$3; if ($1==file && gsub(groups[i]",", "rep", kek) != 0) {print $0}}} else if (defaultfl != "") {if ($1==file && $3 == "") {print $0}} else {if ($1==file) {print $0}}}' | awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {print $0; next;}}}' | awk 'BEGIN{FS=OFS=";";} {if ($3 == "") {print $2":;-";} else {print $2":;"substr($3, 1, length($3)-1);}}' | column -t -s ";" | awk 'BEGIN{FS=OFS=":";} {print $1":"substr($2, 2, length($2));}' # sorts lines, then prints lines with filename and matching groups, then prints lines with date in range, then prints lines with format "file;grp1,grp2...", then columnizes, then deletes one space in front of each line
 
 }
 make_secret_log() {
