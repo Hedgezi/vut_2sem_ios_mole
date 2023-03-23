@@ -1,9 +1,9 @@
 #!/bin/sh
+# xvoron03 Vorontsov Mykola
 
-usage() { printf " mole [-g GROUP] FILE\n mole [-m] [FILTERS] [DIRECTORY]\n mole list [FILTERS] [DIRECTORY]\n mole secret-log [-b DATE] [-a DATE] [DIRECTORY1 [DIRECTORY2 [...]]\n" 1>&2; exit 0; }
-# check_groups() {
-#    grep "^[A-Za-z1-9,]*$" 
-# }
+export POSIXLY_CORRECT=true
+
+usage() { printf " Usage:\n mole [-g GROUP] FILE\n mole [-m] [FILTERS] [DIRECTORY]\n mole list [FILTERS] [DIRECTORY]\n mole secret-log [-b DATE] [-a DATE] [DIRECTORY1 [DIRECTORY2 [...]]\n" 1>&2; exit 0; }
 write_a_record() {
     temp="$(grep -m 1 "$1;$2;" "$MOLE_RC")"
     if [ "$temp" = "" ]
@@ -120,6 +120,11 @@ check_env_variables() {
         echo "Realpath is not installed on your system!" 1>&2
         exit 2
     fi
+    if [ "$(realpath "$MOLE_RC" 2> /dev/null)" = "" ]
+    then
+        mkdir -p "$(echo "$MOLE_RC" | rev | cut -d'/' -f 2- | rev)"
+        touch "$MOLE_RC"
+    fi
 }
 make_list() {
     check_env_variables
@@ -185,9 +190,11 @@ make_secret_log() {
 
     check_args_correctness "secret-log" "$recentlyflag" "$afterdate" "$beforedate" "$defaultflag" "$groups"
 
+    mkdir -p "$HOME/.mole"
+
     if [ "$1" = "" ]
     then
-        awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {result = ""; for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {if (result == "") {result = $1"/"$2";"$(i)} else {result = result";"$(i)}}} if (result != "") {print result;}}' "$MOLE_RC" | sort
+        awk -v afterdate="$afterdate" -v beforedate="$beforedate" 'BEGIN{FS=OFS=";"; if (afterdate=="") {afterdate="1901-12-14"}; if (beforedate=="") {beforedate="9999-01-01"};} {result = ""; for (i=4; i<NF+1; i+=1) {split($i, datearr, "_"); if (datearr[1] < beforedate && datearr[1] > afterdate) {if (result == "") {result = $1"/"$2";"$(i)} else {result = result";"$(i)}}} if (result != "") {print result;}}' "$MOLE_RC" | sort | bzip2 -c > "$HOME/.mole/log_$USER_$(date "+%Y-%m-%d_%H-%M-%S").bz2"
         exit 0
     fi
 
@@ -208,8 +215,7 @@ $(awk -v file="$filename" 'BEGIN{FS=OFS=";"} {if ($1==file) {print $0}}' "$MOLE_
 
         fi
     done
-    resultlog=$(echo "$resultlog" | sort)
-    echo "$resultlog"
+    resultlog=$(echo "$resultlog" | sort | bzip2 -c > "$HOME/.mole/log_$USER_$(date "+%Y-%m-%d_%H-%M-%S").bz2")
 }
 
 
